@@ -1,0 +1,15 @@
+{
+  "name": "project-kb",
+  "version": "0.0.1",
+  "engines": {
+    "node": "9.10.0",
+    "npm": "5.6.0"
+  },
+  "description": "Project KB",
+  "main": "web.js",
+  "dependencies": {
+  },
+  "repository": {
+  },
+  "author": "Abhay Raghuwanshi"
+}
