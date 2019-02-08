@@ -67,6 +67,7 @@ function receiveFromClient(socket,data){
 	const iType = msg_parts[3];
 	switch(iType){
 		case 'Q0'://*SCOR,OM,123456789123456,Q0,412,80,28#<LF>
+		log("RECVD- Log request");
 			cmap.vendor_code = msg_parts[1];
 			cmap.id = msg_parts[2];
 			cmap.config.voltage = msg_parts[4];
@@ -75,6 +76,7 @@ function receiveFromClient(socket,data){
 		break;
 
 		case 'H0'://*SCOR,OM,123456789123456,H0,0,412,28,80,0#<LF>
+			log("RECVD-HeardBeep");
 			cmap.config.locked = msg_parts[4];
 			cmap.config.voltage = msg_parts[5];			
 			cmap.config.signal = msg_parts[6];
@@ -84,7 +86,7 @@ function receiveFromClient(socket,data){
 
 		case 'R0'://*SCOR,OM,123456789123456,R0,0,55,1234,1497689816#<LF>
 			const operation=msg_parts[4]==1?"lock":"unlock";
-			log("operation: "+operation);
+			log("RECVD- init-" + operation);
 			cmap.operation_key = msg_parts[5];
 			if(operation == "lock"){
 				socket.write(makeCommand(cmap,'LOCK'));
@@ -95,7 +97,7 @@ function receiveFromClient(socket,data){
 
 		case 'L0'://*SCOR,OM,123456789123456,L0,0,1234,1497689816#<LF>
 			const unlock_result = msg_parts[4];//0 success, 1 fail, 2 key error
-			log("Unlock status received: " + unlock_result);
+			log("RECVD- Unlock status: " + unlock_result);
 			cmap.locking_state = 0;
 			cmap.config.locked = 0;
 			socket.write(makeCommand(cmap,'UNLOCK-CONFIRM'));
@@ -103,12 +105,49 @@ function receiveFromClient(socket,data){
 
 		case 'L1'://*SCOR,OM,123456789123456,L1,0,1234,1497689816,3#<LF> Response
 			const lock_result = msg_parts[4];//0 success, 1 fail, 2 key error
-			log("Lock status received: " + lock_result);
+			log("RECVD- Lock status: " + lock_result);
 			cmap.locking_state = 0;
 			cmap.config.locked = 1;
 			cmap.last_cycling_time = msg_parts[7];
 			socket.write(makeCommand(cmap,'LOCK-CONFIRM'));
 		break;
+
+		case 'W0'://*SCOR,OM,123456789123456,W0,1#<LF>			
+			//alarm_type 1:Illegal movement alarm  2:Falling alarm  3:Low power alarm
+			const alarm_type = msg_parts[4];
+			log("RECVD- Alarm " + alarm_type);
+			//TOdo not doing anything for alarm as of now
+			socket.write(makeCommand(cmap,'ALRAM-RECEIVED'));
+		break;
+
+		case 'E0'://SCOR,OM,123456789123456,E0,1#<LF> Upload controller fault code
+			const fault_code = msg_parts[4];
+			log("RECVD- ERROR - Upload controller fault " + fault_code);
+			socket.write(makeCommand(cmap,'FAULT-ACK'));			
+			//
+		break;
+
+		case 'D1'://*SCOS,OM,123456789123456,D1,60
+			const interval = msg_parts[4];
+			log("RECVD- Tracking with: " + interval);
+		break;
+
+		case 'D0'://*SCOR,OM,123456789123456,D0,0,124458.00,A,2237.7514,N,11408.6214,E,6,0.21,151216,10,M,A#
+			const gps_identifier = msg_parts[4];//0: Command acquisition positioning upload identifier 1: Position tracking upload positioning identifier
+			log("RECVD- GPS " + gps_identifier);
+			const gps_time = msg_parts[5];//UTC time, hhmmss
+			const gps_valid = msg_parts[6]=='A'?true:false;
+			const gps_lat_deg = msg_parts[7];
+			const gps_lat_hemi = msg_parts[8];
+			const gps_lon_deg = msg_parts[9];
+			const gps_lon_hemi = msg_parts[10];
+			const gps_accuracy = msg_parts[11];
+			const gps_date = msg_parts[12];//UTC date, hhmmss
+			const gps_alt = msg_parts[13];
+			const gps_height = msg_parts[14];
+			const gps_tracking_mode = msg_parts[15];
+		break;		
+
 	}
 	if(cmap.id && !socketsById[cmap.id]){
 		log("updating clientMapById for: " + cmap.id);
@@ -120,28 +159,52 @@ function receiveFromClient(socket,data){
 function makeCommand(cmap, command){
 	var cmd = HEADER + "," +  cmap.vendor_code + "," + cmap.id + ",";
 	switch(command){
-		case 'INIT-LOCK':
-			//*SCOS,OM,123456789123456,R0,0,20,1234,1497689816#<LF>
+		case 'INIT-LOCK'://*SCOS,OM,123456789123456,R0,0,20,1234,1497689816#<LF>
+			log("SENDING- Initilizing lock");
 			cmap.lock_timestamp = Math.floor(Date.now() / 1000);
 			cmap.locking_state = 1;
 			cmd = cmd + "R0,1,20," + USER_ID + "," + cmap.lock_timestamp;
 		break;
-		case 'UNLOCK':
-			//*SCOS,OM,123456789123456,L0,55,1234,1497689816#<LF>
-			cmd = cmd + "L0," + cmap.operation_key + "," + USER_ID + "," + cmap.lock_timestamp;
-		break;
-		case 'UNLOCK-CONFIRM':
-			//*SCOS,OM,123456789123456,L0#<LF>
-			cmd = cmd + "L0";
-		break;
-		case 'LOCK':
-			//*SCOS,OM,123456789123456,L1,55#<LF>
+		case 'LOCK'://*SCOS,OM,123456789123456,L1,55#<LF>
+			log("SENDING- Locking");
 			cmd = cmd + "L1," + cmap.operation_key;
 		break;
-		case 'LOCK-CONFIRM':
-			//*SCOS,OM,123456789123456,L1#<LF>
+		case 'LOCK-CONFIRM'://*SCOS,OM,123456789123456,L1#<LF>
+			log("SENDING- Lock ack");
 			cmd = cmd + "L1";
+		break;	
+
+		case 'INIT-UNLOCK'://*SCOS,OM,123456789123456,R0,0,20,1234,1497689816#<LF>
+			log("SENDING- Initilizing un-lock");
+			cmap.lock_timestamp = Math.floor(Date.now() / 1000);
+			cmap.locking_state = 1;
+			cmd = cmd + "R0,1,20," + USER_ID + "," + cmap.lock_timestamp;
+		break;			
+		case 'UNLOCK'://*SCOS,OM,123456789123456,L0,55,1234,1497689816#<LF>
+			log("SENDING- Un-locking");
+			cmd = cmd + "L0," + cmap.operation_key + "," + USER_ID + "," + cmap.lock_timestamp;
 		break;
+		case 'UNLOCK-CONFIRM'://*SCOS,OM,123456789123456,L0#<LF>
+			log("SENDING- Un-lock ack");
+			cmd = cmd + "L0";
+		break;
+		case 'ALRAM-RECEIVED'://*SCOS,OM,123456789123456,W0#<LF>
+			log("SENDING- Alarm ack");
+			cmd = cmd + "W0";
+		break;
+		case 'FAULT-ACK'://*SCOS,OM,123456789123456,E0#<LF>
+			log("SENDING- FAULT-ACK");
+			cmd = cmd + "E0";
+		break;
+		case 'START-TRACKING'://*SCOS,OM,123456789123456,D1,60#<LF>
+			log("SENDING- START-TRACKING");
+			cmd = cmd + "D1,30"; //TODO - make the interval variable
+		break;
+		case 'STOP-TRACKING'://*SCOS,OM,123456789123456,D1,60#<LF>
+			log("SENDING- STOP-TRACKING");
+			cmd = cmd + "D1,0"; 
+		break;
+		
 	}
 	return cmd + "\n";
 }
@@ -158,6 +221,30 @@ function lockBox(id){
 		return false;
 	}
 	cmap.socket.write(makeCommand(cmap,'INIT-LOCK'));
+}
+
+function unlockBox(id){	
+	var socket = socketsById[id];
+	if(!socket){
+		log("unlock error: client not logged in: " + id);
+		return false;
+	}
+	const cmap = clientMap[socket];
+	if(cmap.locking_state == 1){
+		log("unlock error: locking in-progress: " + id);
+		return false;
+	}
+	cmap.socket.write(makeCommand(cmap,'INIT-UNLOCK'));
+}
+
+function startTracking(id){
+	var socket = socketsById[id];
+	if(!socket){
+		log("GPS tracking error: client not logged in: " + id);
+		return false;
+	}
+	const cmap = clientMap[socket];
+	cmap.socket.write(cmap,"START-TRACKING");
 }
 
 function disconnectFromClient(socket){
