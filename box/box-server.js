@@ -28,6 +28,7 @@ function BoxStateInit(){
 		lock_timestamp:0,
 		operation_key:null,
 		last_cycling_time:"0",
+		data:"",
 	}
 }
 
@@ -54,16 +55,26 @@ module.exports.init = function(){
 }
 
 
+
 function receiveFromClient(socket,data){
 	var cmap = clientMap[socket];
 	log('Received: ' + data);
 	log('cmap: ' + JSON.stringify(cmap));
 	//0xFFFF*SCOS,OM,123456789123456,XX,DDD#<Wrap>
-	var strData = data.toString('utf8');
-	strData = strData.substring(0,strData.length-1) ;
-	log("received after: " +strData.length);
-	//TODO should I remove # as well?
-	const msg_parts = strData.split(',');
+	var strData = cmap.data + data.toString('utf8');
+	while((idx = strData.indexOf("\n")) != -1){
+		log("idx "+idx);
+		const chunk = strData.substring(0,idx);//TODO Will # also come before \n
+		log("chunk " + chunk);
+		processResponse(socket,chunk);
+		strData = strData.substring(idx+1);
+	}
+}
+
+function processResponse(socket,data){	
+	log("processResponse" + data);
+	var cmap = clientMap[socket];
+	const msg_parts = data.split(',');
 	const iType = msg_parts[3];
 	switch(iType){
 		case 'Q0'://*SCOR,OM,123456789123456,Q0,412,80,28#<LF>
@@ -76,12 +87,16 @@ function receiveFromClient(socket,data){
 		break;
 
 		case 'H0'://*SCOR,OM,123456789123456,H0,0,412,28,80,0#<LF>
-			log("RECVD-HeardBeep");
+			log("RECVD-HeartBeep");
 			cmap.config.locked = msg_parts[4];
 			cmap.config.voltage = msg_parts[5];			
 			cmap.config.signal = msg_parts[6];
 			cmap.config.power = msg_parts[7];
 			cmap.config.charging = msg_parts[8];
+			log("cmap.config.gps_state",cmap.gps_state);
+			if(cmap.gps_state == 0){
+				startTracking(cmap.id);
+			}
 		break;
 
 		case 'R0'://*SCOR,OM,123456789123456,R0,0,55,1234,1497689816#<LF>
@@ -129,6 +144,7 @@ function receiveFromClient(socket,data){
 
 		case 'D1'://*SCOS,OM,123456789123456,D1,60
 			const interval = msg_parts[4];
+			cmap.gps_state = 1;
 			log("RECVD- Tracking with: " + interval);
 		break;
 
@@ -248,17 +264,25 @@ module.exports.unlockBox = function(id){
 }
 
 function startTracking(id){
+	log("startTracking");
 	var socket = socketsById[id];
 	if(!socket){
 		log("GPS tracking error: client not logged in: " + id);
 		return false;
 	}
 	const cmap = clientMap[socket];
-	cmap.socket.write(cmap,"START-TRACKING");
+	socket.write(makeCommand(cmap,"START-TRACKING"));
 }
 
 function disconnectFromClient(socket){
 	log('box-server client disconnected');
+	var cmap = clientMap[socket];
+	if(cmap){		
+		if(socketsById[cmap.id])
+			delete socketsById[cmap.id];
+		delete clientMap[socket];
+	}
+	socket.destroy();
 }
 
 module.exports.getNearMeDevices = function(){
