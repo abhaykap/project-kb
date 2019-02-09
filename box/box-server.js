@@ -16,7 +16,7 @@ function BoxStateInit(){
 		vendor_code:null,
 		id:null,
 		config:{
-			locked:-1,
+			locked:-1,//1 locked, 0 unlocked
 			voltage:-1,
 			power:-1,
 			signal:-1,
@@ -49,7 +49,7 @@ module.exports.init = function(){
   		throw err;
 	});
 
-	server.listen(1337, '127.0.0.1');
+	server.listen(1338, '127.0.0.1');
 
 }
 
@@ -60,7 +60,7 @@ function receiveFromClient(socket,data){
 	log('cmap: ' + JSON.stringify(cmap));
 	//0xFFFF*SCOS,OM,123456789123456,XX,DDD#<Wrap>
 	var strData = data.toString('utf8');
-	strData = strData.substring(0,strData.length-2) ;//remove new line TODO put -1
+	strData = strData.substring(0,strData.length-1) ;
 	log("received after: " +strData.length);
 	//TODO should I remove # as well?
 	const msg_parts = strData.split(',');
@@ -178,7 +178,7 @@ function makeCommand(cmap, command){
 			log("SENDING- Initilizing un-lock");
 			cmap.lock_timestamp = Math.floor(Date.now() / 1000);
 			cmap.locking_state = 1;
-			cmd = cmd + "R0,1,20," + USER_ID + "," + cmap.lock_timestamp;
+			cmd = cmd + "R0,0,20," + USER_ID + "," + cmap.lock_timestamp;
 		break;			
 		case 'UNLOCK'://*SCOS,OM,123456789123456,L0,55,1234,1497689816#<LF>
 			log("SENDING- Un-locking");
@@ -209,32 +209,42 @@ function makeCommand(cmap, command){
 	return cmd + "\n";
 }
 
-function lockBox(id){	
+module.exports.lockBox = function(id){	
 	var socket = socketsById[id];
 	if(!socket){
 		log("lock error: client not logged in: " + id);
-		return false;
+		return {success:false,status:"lock error: client not logged in: " + id};
 	}
 	const cmap = clientMap[socket];
+	if(cmap.config.locked != 0){
+		log("lock error: not unlocked: " + id);
+		return {success:false,status:"lock error: not unlocked: " + id};
+	}
 	if(cmap.locking_state == 1){
 		log("lock error: locking in-progress: " + id);
-		return false;
-	}
-	cmap.socket.write(makeCommand(cmap,'INIT-LOCK'));
+		return {success:false,status:"lock error: locking in-progress: " + id};
+	}	
+	socket.write(makeCommand(cmap,'INIT-LOCK'));
+	return {success:true,status:"lock started"};
 }
 
-function unlockBox(id){	
+module.exports.unlockBox = function(id){
 	var socket = socketsById[id];
 	if(!socket){
 		log("unlock error: client not logged in: " + id);
-		return false;
+		return {success:false,status:"unlock error: client not logged in: " + id};
 	}
 	const cmap = clientMap[socket];
-	if(cmap.locking_state == 1){
-		log("unlock error: locking in-progress: " + id);
-		return false;
+	if(cmap.config.locked != 1){
+		log("unlock error: not locked: " + id);
+		return {success:false,status:"unlock error: not locked: " + id};
 	}
-	cmap.socket.write(makeCommand(cmap,'INIT-UNLOCK'));
+	if(cmap.locking_state == 1){
+		log("unlock error: unlocking in-progress: " + id);
+		return {success:false,status:"unlock error: unlocking in-progress: " + id};
+	}
+	socket.write(makeCommand(cmap,'INIT-UNLOCK'));
+	return {success:true,status:"unlock started"};
 }
 
 function startTracking(id){
@@ -251,6 +261,8 @@ function disconnectFromClient(socket){
 	log('box-server client disconnected');
 }
 
-
+module.exports.getNearMeDevices = function(){
+	return Object.values(clientMap);
+}
 
 
