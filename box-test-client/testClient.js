@@ -7,7 +7,7 @@ const box_server_port = 1338;
 var lock_status = 1;
 
 function sendMessage(msg){
-	client.write(msg + "\n");
+	client.write(msg + "#\n");
 }
 
 client.connect(box_server_port,box_server_ip , function() {

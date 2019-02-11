@@ -29,6 +29,12 @@ app.get('/', function(req, res) {
     res.json(box.getNearMeDevices());
 });
 
+app.get('/nearme', function(req, res) {
+    // for debugging    
+    res.json(box.getNearMe());
+});
+
+
 app.get('/lock/:id',function(req,res){
     res.json(box.lockBox(req.params.id));
 });

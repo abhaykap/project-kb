@@ -1,4 +1,5 @@
-var net = require('net');
+const net = require('net');
+const moment = require('moment');
 
 const HEADER = String.fromCharCode(0XFF,0XFF) + '*SCOS';
 const USER_ID = "1234";//TODO whats this for?
@@ -13,14 +14,20 @@ function log(str){
 
 function BoxStateInit(){
 	return {		
-		vendor_code:null,
-		id:null,
+		vendor_code:null,		
 		config:{
+			id:null,
 			locked:-1,//1 locked, 0 unlocked
 			voltage:-1,
 			power:-1,
 			signal:-1,
-			charging:-1,			
+			charging:-1,		
+			gps_valid:false,
+			latitude:-1,
+			longitude:-1,
+			gps_accuracy:"0",
+			altitude: "0M",
+			gps_time:""
 		},
 		loggin_state:0,//0=not logged in,1=logged in
 		locking_state:0,//0=idle, 1=in-porgress
@@ -64,11 +71,31 @@ function receiveFromClient(socket,data){
 	var strData = cmap.data + data.toString('utf8');
 	while((idx = strData.indexOf("\n")) != -1){
 		log("idx "+idx);
-		const chunk = strData.substring(0,idx);//TODO Will # also come before \n
+		const chunk = strData.substring(0,idx-1);//TODO assming # is part of end of message: <#\n>
 		log("chunk " + chunk);
 		processResponse(socket,chunk);
 		strData = strData.substring(idx+1);
 	}
+}
+
+function calcLatitude(lat,hemi){
+	const deg = parseFloat(lat.substring(0,2));
+	var min = lat.substring(2);
+	min = parseFloat(min)/60;
+	lat = deg + min;
+	if(hemi == 'N')
+		return lat;
+	return (lat * -1);
+}
+
+function calcLongitude(lon,hemi){
+	const deg = parseFloat(lon.substring(0,3));
+	var min = lon.substring(3);
+	min = parseFloat(min)/60;
+	lon = deg + min;
+	if(hemi == 'E')
+		return lon
+	return (lon * -1);
 }
 
 function processResponse(socket,data){	
@@ -80,7 +107,7 @@ function processResponse(socket,data){
 		case 'Q0'://*SCOR,OM,123456789123456,Q0,412,80,28#<LF>
 		log("RECVD- Log request");
 			cmap.vendor_code = msg_parts[1];
-			cmap.id = msg_parts[2];
+			cmap.config.id = msg_parts[2];
 			cmap.config.voltage = msg_parts[4];
 			cmap.config.power = msg_parts[5];
 			cmap.config.signal = msg_parts[6];
@@ -95,7 +122,7 @@ function processResponse(socket,data){
 			cmap.config.charging = msg_parts[8];
 			log("cmap.config.gps_state",cmap.gps_state);
 			if(cmap.gps_state == 0){
-				startTracking(cmap.id);
+				startTracking(cmap.config.id);
 			}
 		break;
 
@@ -153,27 +180,36 @@ function processResponse(socket,data){
 			log("RECVD- GPS " + gps_identifier);
 			const gps_time = msg_parts[5];//UTC time, hhmmss
 			const gps_valid = msg_parts[6]=='A'?true:false;
-			const gps_lat_deg = msg_parts[7];
-			const gps_lat_hemi = msg_parts[8];
-			const gps_lon_deg = msg_parts[9];
-			const gps_lon_hemi = msg_parts[10];
-			const gps_accuracy = msg_parts[11];
-			const gps_date = msg_parts[12];//UTC date, hhmmss
-			const gps_alt = msg_parts[13];
-			const gps_height = msg_parts[14];
-			const gps_tracking_mode = msg_parts[15];
+			if(gps_valid){
+				try{					
+					cmap.config.latitude = calcLatitude(msg_parts[7],msg_parts[8]);//ddmm.mmmm					
+					cmap.config.longitude = calcLongitude(msg_parts[9],msg_parts[10]);
+					cmap.config.gps_accuracy = msg_parts[11];
+					const gps_date = msg_parts[12];//UTC date, hhmmss
+					cmap.config.altitude = msg_parts[14] + msg_parts[15];
+					const gps_tracking_mode = msg_parts[15];
+					cmap.config.gps_time = moment().format("YYYY-MM-DD HH:mm:ssZZ");
+					cmap.config.gps_valid = true;
+				}catch(e){
+					cmap.config.gps_valid = false;
+					log("Excption processing gps: " + e);
+				}
+			}else{
+				cmap.config.gps_valid = false;
+				log("INVALID GPS Received: " + msg_parts[6])
+			}
 		break;		
 
 	}
-	if(cmap.id && !socketsById[cmap.id]){
-		log("updating clientMapById for: " + cmap.id);
-		socketsById[cmap.id] = socket;
+	if(cmap.config.id && !socketsById[cmap.config.id]){
+		log("updating clientMapById for: " + cmap.config.id);
+		socketsById[cmap.config.id] = socket;
 	}
 	log('cmap after: ' + JSON.stringify(cmap));
 }
 
 function makeCommand(cmap, command){
-	var cmd = HEADER + "," +  cmap.vendor_code + "," + cmap.id + ",";
+	var cmd = HEADER + "," +  cmap.vendor_code + "," + cmap.config.id + ",";
 	switch(command){
 		case 'INIT-LOCK'://*SCOS,OM,123456789123456,R0,0,20,1234,1497689816#<LF>
 			log("SENDING- Initilizing lock");
@@ -222,7 +258,7 @@ function makeCommand(cmap, command){
 		break;
 		
 	}
-	return cmd + "\n";
+	return cmd + "#\n";
 }
 
 module.exports.lockBox = function(id){	
@@ -278,8 +314,8 @@ function disconnectFromClient(socket){
 	log('box-server client disconnected');
 	var cmap = clientMap[socket];
 	if(cmap){		
-		if(socketsById[cmap.id])
-			delete socketsById[cmap.id];
+		if(socketsById[cmap.config.id])
+			delete socketsById[cmap.config.id];
 		delete clientMap[socket];
 	}
 	socket.destroy();
@@ -287,6 +323,14 @@ function disconnectFromClient(socket){
 
 module.exports.getNearMeDevices = function(){
 	return Object.values(clientMap);
+}
+
+module.exports.getNearMe = function(){
+	var boxes = [];
+	for(id in clientMap){
+		boxes.push(clientMap[id].config);
+	}
+	return boxes;
 }
 
 
