@@ -57,7 +57,7 @@ module.exports.init = function(){
   		throw err;
 	});
 
-	server.listen(1338, '127.0.0.1');
+	server.listen(3000, '127.0.0.1');
 
 }
 
