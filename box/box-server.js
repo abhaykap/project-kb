@@ -326,7 +326,7 @@ module.exports.getNearMeDevices = function(){
 	for(k in clientMap){
 		boxes.push(clientMap[k]);		
 	}
-	return Object.values(boxes);
+	return boxes;
 }
 
 module.exports.getNearMe = function(){
