@@ -10,18 +10,23 @@ function sendMessage(msg){
 	client.write(msg + "#\n");
 }
 
-client.connect(box_server_port,box_server_ip , function() {
-	console.log('Connected');
-	sendMessage("*SCOR,OM,123456789123456,Q0,412,80,28");
-	sendMessage("*SCOR,OM,123456789123456,H0," + lock_status + ",412,28,80,1");
-	setInterval(function(){ sendMessage("*SCOR,OM,123456789123456,H0," + lock_status + ",412,28,80,0") }, 60*4*1000);
-	sendMessage("*SCOR,OM,123456789123456,D0,0,124458.00,A,2237.7514,N,11408.6214,E,6,0.21,151216,10,M,A")
-	setInterval(function(){sendMessage("*SCOR,OM,123456789123456,D0,0,124458.00,A,2237.7514,N,11408.6214,E,6,0.21,151216,10,M,A")},3*1000);
-});
-
+function connect(){
+	client.connect(box_server_port,box_server_ip , function() {
+		console.log('Connected');
+		sendMessage("*SCOR,OM,123456789123456,Q0,412,80,28");
+		sendMessage("*SCOR,OM,123456789123456,H0," + lock_status + ",412,28,80,1");
+		setInterval(function(){ sendMessage("*SCOR,OM,123456789123456,H0," + lock_status + ",412,28,80,0") }, 60*4*1000);
+		sendMessage("*SCOR,OM,123456789123456,D0,0,124458.00,A,2237.7514,N,11408.6214,E,6,0.21,151216,10,M,A")
+		setInterval(function(){sendMessage("*SCOR,OM,123456789123456,D0,0,124458.00,A,2237.7514,N,11408.6214,E,6,0.21,151216,10,M,A")},5*60*1000);
+	});
+}
+connect();
 client.on('error',function(err){
 	console.log("Connection error",err);
 	client.destroy();
+	console.log("error");
+	setTimeout(connect,30*1000);
+	
 });
 
 client.on('data', function(data) {
@@ -44,4 +49,5 @@ client.on('data', function(data) {
 
 client.on('close', function() {
 	console.log('Connection closed');
+	connect();
 });

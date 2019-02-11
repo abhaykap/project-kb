@@ -322,7 +322,11 @@ function disconnectFromClient(socket){
 }
 
 module.exports.getNearMeDevices = function(){
-	return Object.values(clientMap);
+	var boxes = [];
+	for(k in clientMap){
+		boxes.push(clientMap[k]);		
+	}
+	return Object.values(boxes);
 }
 
 module.exports.getNearMe = function(){
