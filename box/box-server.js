@@ -9,7 +9,7 @@ var clientMap = {};
 var socketsById = {};
 
 function log(str){
-	console.log("BOX-SERVER:",str);
+	console.log("BOX-SERVER: " + str);
 }
 
 function BoxStateInit(){
@@ -57,7 +57,9 @@ module.exports.init = function(){
   		throw err;
 	});
 
-	server.listen(3000, '127.0.0.1');
+	server.listen(3002,function() { //'listening' listener
+	  log('server bound with port: 3002');
+	});
 
 }
 

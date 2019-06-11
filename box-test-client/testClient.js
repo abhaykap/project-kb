@@ -3,7 +3,7 @@ var net = require('net');
 var client = new net.Socket();
 
 const box_server_ip = '127.0.0.1';
-const box_server_port = 3000;
+const box_server_port = 3002;
 var lock_status = 1;
 
 function sendMessage(msg){

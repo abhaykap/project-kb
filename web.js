@@ -3,6 +3,9 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var http = require('http');
 var domain = require('domain');
+var fs = require('fs');
+var proc = require('process');
+var util = require('util');
 
 const box = require('./box/box-server');
 const node_port = 3001;
@@ -44,6 +47,16 @@ app.get('/unlock/:id',function(req,res){
 });
 
 
+var log_file = fs.createWriteStream(__dirname + '/debug.log', {flags : 'a'});
+log_file.write("------------------------" + new Date() + "-------------------" + '\n');
+var log_stdout = process.stdout;
+
+console.log = function(d) { //
+  log_file.write(util.format(d) + '\n');
+  log_stdout.write(util.format(d) + '\n');
+};
+
+
 var web = http.createServer(app);
 process.on('exit', function() {
     console.log('exit');
@@ -51,3 +64,6 @@ process.on('exit', function() {
 app.listen(node_port, function() {
     console.log("Mag7: web.js listening on " + node_port);
 });
+
+
+
