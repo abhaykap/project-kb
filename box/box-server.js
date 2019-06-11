@@ -66,17 +66,22 @@ module.exports.init = function(){
 
 
 function receiveFromClient(socket,data){
-	var cmap = clientMap[socket];
-	log('Received: ' + data);
-	log('cmap: ' + JSON.stringify(cmap));
-	//0xFFFF*SCOS,OM,123456789123456,XX,DDD#<Wrap>
-	var strData = cmap.data + data.toString('utf8');
-	while((idx = strData.indexOf("\n")) != -1){
-		log("idx "+idx);
-		const chunk = strData.substring(0,idx-1);//TODO assming # is part of end of message: <#\n>
-		log("chunk " + chunk);
-		processResponse(socket,chunk);
-		strData = strData.substring(idx+1);
+	try{
+		var cmap = clientMap[socket];
+		log('Received: ' + data);
+		log('cmap: ' + JSON.stringify(cmap));
+		//0xFFFF*SCOS,OM,123456789123456,XX,DDD#<Wrap>
+		var strData = cmap.data + data.toString('utf8');
+		while((idx = strData.indexOf("\n")) != -1){
+			log("idx "+idx);
+			const chunk = strData.substring(0,idx-1);//TODO assming # is part of end of message: <#\n>
+			log("chunk " + chunk);
+			processResponse(socket,chunk);
+			strData = strData.substring(idx+1);
+		}
+	}catch(e){
+		log('EXCEPTION:' + e);
+		log(e.stack);
 	}
 }
 
