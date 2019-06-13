@@ -42,7 +42,9 @@ function BoxStateInit(){
 module.exports.init = function(){
 
 	var server = net.createServer(function(socket) {
-	    log("new client connect");
+	    log("new client connect: " + socket);
+	    socket.setNoDelay(true);
+	    socket.setKeepAlive(true);
 	    clientMap[socket] = BoxStateInit();
 	    socket.on('end', function(){
 	    	log('end from client: ' + socket);
