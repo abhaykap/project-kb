@@ -45,12 +45,14 @@ module.exports.init = function(){
 	    log("new client connect");
 	    clientMap[socket] = BoxStateInit();
 	    socket.on('end', function(){
+	    	log('end from client: ' + socket);
 	    	disconnectFromClient(socket);    		
   		});
 	    socket.on('data',function(data) {	
 	    	receiveFromClient(socket,data);
 		});
 	    socket.on('error', function(){
+	    	log('Error in socket: ' + socket);
 	    	disconnectFromClient(socket);    		
   		});
 	});
