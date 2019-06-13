@@ -118,6 +118,7 @@ function processResponse(socket,data){
 			cmap.config.voltage = msg_parts[4];
 			cmap.config.power = msg_parts[5];
 			cmap.config.signal = msg_parts[6];
+			socket.write(makeCommand(cmap,'INIT-LOCK'));
 		break;
 
 		case 'H0'://*SCOR,OM,123456789123456,H0,0,412,28,80,0#<LF>
@@ -128,15 +129,16 @@ function processResponse(socket,data){
 			cmap.config.power = msg_parts[7];
 			cmap.config.charging = msg_parts[8];
 			log("cmap.config.gps_state",cmap.gps_state);
-			if(cmap.gps_state == 0){
-				startTracking(cmap.config.id);
-			}
+			// if(cmap.gps_state == 0){
+			// 	startTracking(cmap.config.id);
+			// }			
 		break;
 
 		case 'R0'://*SCOR,OM,123456789123456,R0,0,55,1234,1497689816#<LF>
 			const operation=msg_parts[4]==1?"lock":"unlock";
 			log("RECVD- init-" + operation);
 			cmap.operation_key = msg_parts[5];
+			log("cmap.operation_key: " + cmap.operation_key);
 			if(operation == "lock"){
 				socket.write(makeCommand(cmap,'LOCK'));
 			}else{
@@ -265,6 +267,7 @@ function makeCommand(cmap, command){
 		break;
 		
 	}
+	log("Sending: " + cmd);
 	return cmd + "#\n";
 }
 
@@ -275,14 +278,14 @@ module.exports.lockBox = function(id){
 		return {success:false,status:"lock error: client not logged in: " + id};
 	}
 	const cmap = clientMap[socket];
-	if(cmap.config.locked != 0){
-		log("lock error: not unlocked: " + id);
-		return {success:false,status:"lock error: not unlocked: " + id};
-	}
-	if(cmap.locking_state == 1){
-		log("lock error: locking in-progress: " + id);
-		return {success:false,status:"lock error: locking in-progress: " + id};
-	}	
+	// if(cmap.config.locked != 0){
+	// 	log("lock error: not unlocked: " + id);
+	// 	return {success:false,status:"lock error: not unlocked: " + id};
+	// }
+	// if(cmap.locking_state == 1){
+	// 	log("lock error: locking in-progress: " + id);
+	// 	return {success:false,status:"lock error: locking in-progress: " + id};
+	// }	
 	socket.write(makeCommand(cmap,'INIT-LOCK'));
 	return {success:true,status:"lock started"};
 }
@@ -294,14 +297,14 @@ module.exports.unlockBox = function(id){
 		return {success:false,status:"unlock error: client not logged in: " + id};
 	}
 	const cmap = clientMap[socket];
-	if(cmap.config.locked != 1){
-		log("unlock error: not locked: " + id);
-		return {success:false,status:"unlock error: not locked: " + id};
-	}
-	if(cmap.locking_state == 1){
-		log("unlock error: unlocking in-progress: " + id);
-		return {success:false,status:"unlock error: unlocking in-progress: " + id};
-	}
+	// if(cmap.config.locked != 1){
+	// 	log("unlock error: not locked: " + id);
+	// 	return {success:false,status:"unlock error: not locked: " + id};
+	// }
+	// if(cmap.locking_state == 1){
+	// 	log("unlock error: unlocking in-progress: " + id);
+	// 	return {success:false,status:"unlock error: unlocking in-progress: " + id};
+	// }
 	socket.write(makeCommand(cmap,'INIT-UNLOCK'));
 	return {success:true,status:"unlock started"};
 }
