@@ -50,6 +50,9 @@ module.exports.init = function(){
 	    socket.on('data',function(data) {	
 	    	receiveFromClient(socket,data);
 		});
+	    socket.on('error', function(){
+	    	disconnectFromClient(socket);    		
+  		});
 	});
 
 	server.on('error', (err) => {
