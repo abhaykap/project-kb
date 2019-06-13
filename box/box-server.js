@@ -63,7 +63,14 @@ module.exports.init = function(){
 
 }
 
-
+function sendToClient(socket,data){
+	try{
+		socket.write(data);
+	}catch(e){
+		log('sendToClient EXCEPTION:' + e);
+		log(e.stack);
+	}
+}
 
 function receiveFromClient(socket,data){
 	try{
@@ -79,8 +86,9 @@ function receiveFromClient(socket,data){
 			processResponse(socket,chunk);
 			strData = strData.substring(idx+1);
 		}
+		cmap.data += strData;
 	}catch(e){
-		log('EXCEPTION:' + e);
+		log('receiveFromClient EXCEPTION:' + e);
 		log(e.stack);
 	}
 }
@@ -118,7 +126,7 @@ function processResponse(socket,data){
 			cmap.config.voltage = msg_parts[4];
 			cmap.config.power = msg_parts[5];
 			cmap.config.signal = msg_parts[6];
-			socket.write(makeCommand(cmap,'INIT-LOCK'));
+			//sendToClient(socket,makeCommand(cmap,'INIT-LOCK'));
 		break;
 
 		case 'H0'://*SCOR,OM,123456789123456,H0,0,412,28,80,0#<LF>
@@ -140,9 +148,9 @@ function processResponse(socket,data){
 			cmap.operation_key = msg_parts[5];
 			log("cmap.operation_key: " + cmap.operation_key);
 			if(operation == "lock"){
-				socket.write(makeCommand(cmap,'LOCK'));
+				sendToClient(socket,makeCommand(cmap,'LOCK'));
 			}else{
-				socket.write(makeCommand(cmap,'UNLOCK'));
+				sendToClient(socket,makeCommand(cmap,'UNLOCK'));
 			}
 		break;
 
@@ -151,7 +159,7 @@ function processResponse(socket,data){
 			log("RECVD- Unlock status: " + unlock_result);
 			cmap.locking_state = 0;
 			cmap.config.locked = 0;
-			socket.write(makeCommand(cmap,'UNLOCK-CONFIRM'));
+			sendToClient(socket,makeCommand(cmap,'UNLOCK-CONFIRM'));
 		break;
 
 		case 'L1'://*SCOR,OM,123456789123456,L1,0,1234,1497689816,3#<LF> Response
@@ -160,7 +168,7 @@ function processResponse(socket,data){
 			cmap.locking_state = 0;
 			cmap.config.locked = 1;
 			cmap.last_cycling_time = msg_parts[7];
-			socket.write(makeCommand(cmap,'LOCK-CONFIRM'));
+			sendToClient(socket,makeCommand(cmap,'LOCK-CONFIRM'));
 		break;
 
 		case 'W0'://*SCOR,OM,123456789123456,W0,1#<LF>			
@@ -168,13 +176,13 @@ function processResponse(socket,data){
 			const alarm_type = msg_parts[4];
 			log("RECVD- Alarm " + alarm_type);
 			//TOdo not doing anything for alarm as of now
-			socket.write(makeCommand(cmap,'ALRAM-RECEIVED'));
+			sendToClient(socket,makeCommand(cmap,'ALRAM-RECEIVED'));
 		break;
 
 		case 'E0'://SCOR,OM,123456789123456,E0,1#<LF> Upload controller fault code
 			const fault_code = msg_parts[4];
 			log("RECVD- ERROR - Upload controller fault " + fault_code);
-			socket.write(makeCommand(cmap,'FAULT-ACK'));			
+			sendToClient(socket,makeCommand(cmap,'FAULT-ACK'));			
 			//
 		break;
 
@@ -286,7 +294,7 @@ module.exports.lockBox = function(id){
 	// 	log("lock error: locking in-progress: " + id);
 	// 	return {success:false,status:"lock error: locking in-progress: " + id};
 	// }	
-	socket.write(makeCommand(cmap,'INIT-LOCK'));
+	sendToClient(socket,makeCommand(cmap,'INIT-LOCK'));
 	return {success:true,status:"lock started"};
 }
 
@@ -305,7 +313,7 @@ module.exports.unlockBox = function(id){
 	// 	log("unlock error: unlocking in-progress: " + id);
 	// 	return {success:false,status:"unlock error: unlocking in-progress: " + id};
 	// }
-	socket.write(makeCommand(cmap,'INIT-UNLOCK'));
+	sendToClient(socket,makeCommand(cmap,'INIT-UNLOCK'));
 	return {success:true,status:"unlock started"};
 }
 
@@ -317,7 +325,7 @@ function startTracking(id){
 		return false;
 	}
 	const cmap = clientMap[socket];
-	socket.write(makeCommand(cmap,"START-TRACKING"));
+	sendToClient(socket,makeCommand(cmap,"START-TRACKING"));
 }
 
 function disconnectFromClient(socket){
