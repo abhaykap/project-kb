@@ -1,5 +1,6 @@
 const net = require('net');
 const moment = require('moment');
+const fs = require('fs');
 
 const HEADER = String.fromCharCode(0XFF,0XFF) + '*SCOS';
 const USER_ID = "1234";//TODO whats this for?
@@ -36,6 +37,32 @@ function BoxStateInit(){
 		operation_key:null,
 		last_cycling_time:"0",
 		data:"",
+	}
+}
+
+function readClientStateFromFile(id){
+	try{
+		const data = fs.readFileSync(id + '.json', 'utf8');
+		if(data){
+			return JSON.parse(data);
+		}
+	}catch(e){
+		log("readClientStateFromFile error: " + e);
+	}
+	return;
+}
+
+function writeClientStateTo(config){
+	try{
+		const id = config.id;
+		var fs = require('fs');
+		fs.writeFile(id + '.json', JSON.stringify(config), 'utf8', function(err) {
+		    if (err){
+		    	log("writeClientStateTo: " + err);
+		    }
+		});
+	}catch(e){
+		log("writeClientStateTo error: " + e);
 	}
 }
 
@@ -82,6 +109,10 @@ function sendToClient(socket,data){
 function receiveFromClient(socket,data){
 	try{
 		var cmap = clientMap[socket];
+		if(!cmap){
+			log("Old socket data received " + data);
+			return;
+		}
 		log('Received: ' + data);
 		log('cmap: ' + JSON.stringify(cmap));
 		//0xFFFF*SCOS,OM,123456789123456,XX,DDD#<Wrap>
@@ -128,8 +159,14 @@ function processResponse(socket,data){
 	switch(iType){
 		case 'Q0'://*SCOR,OM,123456789123456,Q0,412,80,28#<LF>
 		log("RECVD- Log request");
+			const id = msg_parts[2];
+			const oldState = readClientStateFromFile(id);
+			if(oldState){
+				log("OLD STATE found: " + JSON.stringify(oldState));
+				cmap.config = oldState;
+			}
 			cmap.vendor_code = msg_parts[1];
-			cmap.config.id = msg_parts[2];
+			cmap.config.id = id;
 			cmap.config.voltage = msg_parts[4];
 			cmap.config.power = msg_parts[5];
 			cmap.config.signal = msg_parts[6];
@@ -225,6 +262,7 @@ function processResponse(socket,data){
 		break;		
 
 	}
+	writeClientStateTo(cmap.config);
 	if(cmap.config.id && !socketsById[cmap.config.id]){
 		log("updating clientMapById for: " + cmap.config.id);
 		socketsById[cmap.config.id] = socket;
