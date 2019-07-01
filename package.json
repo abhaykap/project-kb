@@ -10,7 +10,10 @@
   "dependencies": {
     "express": "4.14.0",
     "body-parser": "1.15.2",
-    "moment": "2.24"
+    "moment": "2.24",
+    "read-last-lines":"0.0.1",
+    "child_process":"1.0.2",
+    "subprocess":"0.3.0"
   },
   "repository": {},
   "author": "Abhay Raghuwanshi"

@@ -46,6 +46,23 @@ app.get('/unlock/:id',function(req,res){
     res.json(box.unlockBox(req.params.id));
 });
 
+app.get('/logs',function(req,res){
+    const exec = require('child_process').exec;
+    var handle = exec('tail -n 50 debug.log', function callback(error, stdout, stderr){
+        res.write(stdout);
+    });  
+    handle.unref();  
+});
+
+app.get('/restart',function(req,res){
+    const exec = require('child_process').exec;
+    console.log("restarting...")
+    var handle = exec('pm2 restart 0', function callback(error, stdout, stderr){
+        res.write(stdout);
+    });  
+    handle.unref();  
+});
+
 
 var log_file = fs.createWriteStream(__dirname + '/debug.log', {flags : 'a'});
 log_file.write("------------------------" + new Date() + "-------------------" + '\n');
